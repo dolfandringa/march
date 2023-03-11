@@ -1,0 +1,3 @@
+[EXCEPTIONS]
+overgeneral-exceptions=builtins.BaseException,
+                       builtins.Exception
