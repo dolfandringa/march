@@ -1,8 +1,8 @@
 """
 Main March backend.
 """
-from fastapi import FastAPI
 import uvicorn
+from fastapi import FastAPI
 
 app = FastAPI()
 
@@ -16,5 +16,4 @@ async def root() -> dict:
 
 def start():
     """Start the app."""
-    uvicorn.run("march_backend.main:app", host='0.0.0.0', port=8000,
-                reload=True, workers=2)
+    uvicorn.run("march_backend.main:app", host="0.0.0.0", port=8000, reload=True)
