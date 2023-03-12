@@ -2,7 +2,7 @@
 import json
 from typing import List, Tuple, Union
 
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
 from fastapi.responses import RedirectResponse
 from pydantic import BaseModel
 from requests_oauthlib import OAuth2Session
@@ -37,18 +37,19 @@ async def get_google_session(
         secret = json.loads(secret_file.read())
         print(f"secret: {secret}")
         secret = secret["web"]
+    session = OAuth2Session(
+        client_id=secret["client_id"],
+        state=state,
+        scope=[
+            "https://mail.google.com/",
+            "openid",
+            "https://www.googleapis.com/auth/userinfo.email",
+            "https://www.googleapis.com/auth/userinfo.profile",
+        ],
+        redirect_uri=secret["redirect_uris"][0],
+    )
     return (
-        OAuth2Session(
-            client_id=secret["client_id"],
-            state=state,
-            scope=[
-                "https://mail.google.com/",
-                "openid",
-                "https://www.googleapis.com/auth/userinfo.email",
-                "https://www.googleapis.com/auth/userinfo.profile",
-            ],
-            redirect_uri=secret["redirect_uris"][0],
-        ),
+        session,
         secret,
     )
 
@@ -56,11 +57,17 @@ async def get_google_session(
 @router.get("/auth/oauth/token", tags=["authentication"])
 async def oauth_token(state: str, code: str) -> OAuth2TokenModel:
     """Get the OAuth2 authentication token."""
-    google, secret = await get_google_session(state=state)
+    try:
+        google, secret = await get_google_session(state=state)
+    except Exception as exc:
+        raise HTTPException(status_code=403) from exc
     args = [secret["token_uri"]]
     kwargs = {"client_secret": secret["client_secret"], "code": code}
     print(f"fetchging token for {args} {kwargs}")
-    token = google.fetch_token(*args, **kwargs)
+    try:
+        token = google.fetch_token(*args, **kwargs)
+    except Exception as exc:
+        raise HTTPException(status_code=403) from exc
     return token
 
 
@@ -69,8 +76,11 @@ async def oauth_token(state: str, code: str) -> OAuth2TokenModel:
 )
 async def oauth_start():
     """Authenticate using OAuth for google."""
-    google, secret = await get_google_session()
-    authorization_url = google.authorization_url(
-        secret["auth_uri"], access_type="offline", prompt="select_account"
-    )[0]
+    try:
+        google, secret = await get_google_session()
+        authorization_url = google.authorization_url(
+            secret["auth_uri"], access_type="offline", prompt="select_account"
+        )[0]
+    except Exception as exc:
+        raise HTTPException(status_code=403) from exc
     return authorization_url

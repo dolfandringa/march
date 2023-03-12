@@ -1,8 +1,10 @@
 """Tests for march_backend.auth"""
 import json
+from pathlib import Path
 from unittest.mock import MagicMock, mock_open
 
 import pytest
+from fastapi import HTTPException
 
 from march_backend import auth
 from march_backend.auth import get_google_session, oauth_start
@@ -13,7 +15,8 @@ pytestmark = pytest.mark.asyncio
 @pytest.fixture(name="secret")
 def fixture_secret():
     """client_secret.json fixture"""
-    with open("test_secret.json", "rt", encoding="utf-8") as sec_f:
+    fname = Path(__file__).parent / "test_secret.json"
+    with fname.open("rt", encoding="utf-8") as sec_f:
         test_secret = sec_f.read()
     return test_secret
 
@@ -21,10 +24,9 @@ def fixture_secret():
 class TestGetGoogleSession:
     """Test get_google_session"""
 
-    async def test_default(self, mocker):
+    async def test_default(self, mocker, secret):
         """Test get_google_session"""
-        with open("test_secret.json", "rt", encoding="utf-8") as sec_f:
-            test_secret = sec_f.read()
+        test_secret = secret
         secret = json.loads(test_secret)["web"]
         mock_oauth2session = mocker.patch.object(auth, "OAuth2Session")
         openmock = mock_open(read_data=test_secret)
@@ -67,7 +69,7 @@ class TestGetGoogleSession:
         )
 
 
-class MockGoogleSession:
+class MockGoogleSession:  # pylint: disable=too-few-public-methods
     """Mock Google OAuth2 Session"""
 
     authorization_url = MagicMock(return_value=["bla"])
@@ -91,3 +93,31 @@ class TestOAuthStart:
             secret["auth_uri"], access_type="offline", prompt="select_account"
         )
         assert res == mock_google.authorization_url.return_value[0]
+
+    async def test_get_google_session_error(self, mocker):
+        """
+        Test that a 403 Forbidden exception was raised
+        on get_google_session errors.
+        """
+        mock_get_google_session = mocker.patch.object(auth, "get_google_session")
+        mock_get_google_session.side_effect = TypeError("Test")
+        with pytest.raises(HTTPException) as exc:
+            await oauth_start()
+        assert exc.value.status_code == 403
+
+    async def test_authorization_url_error(self, mocker, secret):
+        """
+        Test that a 403 Forbidden exception was raised
+        on google.authorization_url errors.
+        """
+        mock_get_google_session = mocker.patch.object(auth, "get_google_session")
+        mock_google = MockGoogleSession()
+        mock_google.authorization_url.side_effect = TypeError("Test")
+        secret = json.loads(secret)["web"]
+        mock_get_google_session.return_value = (
+            mock_google,
+            secret,
+        )
+        with pytest.raises(HTTPException) as exc:
+            await oauth_start()
+        assert exc.value.status_code == 403
