@@ -1,11 +1,11 @@
 [tool.poetry]
-name = "march-backend"
+name = "march_backend"
 version = "0.1.0"
 description = "Backend for the Mail Archiver tool"
 authors = ["Dolf Andringa <dolfandringa@gmail.com>"]
 license = "MIT"
 readme = "README.md"
-packages = [{include = "march_backend"}]
+packages = [{include = "march_backend", from="src"}]
 
 [tool.poetry.scripts]
 dev = 'march_backend.main:start'
@@ -13,6 +13,9 @@ dev = 'march_backend.main:start'
 python = "^3.9"
 fastapi = "^0.94.0"
 uvicorn = "^0.21.0"
+oauthlib = "^3.2.2"
+requests-oauthlib = "^1.3.1"
+pydantic = "^1.10.6"
 
 [tool.poetry.group.dev.dependencies]
 black = "^23.1.0"
@@ -24,6 +27,13 @@ pytest-pylint = "^0.19.0"
 flake8 = "^6.0.0"
 isort = "^5.12.0"
 pytest = "^7.2.2"
+pylint-pydantic = "^0.1.7"
+pytest-asyncio = "^0.20.3"
+
+[tool.pytest.ini_options]
+addopts = [
+    "--import-mode=importlib",
+]
 
 [tool.isort]
 profile = "black"
@@ -31,8 +41,12 @@ profile = "black"
 [tool.pylint.format]
 max-line-length = "88"
 
-[tool.pylint.EXCPETIONS]
-overgeneral-exceptions="builtins.BaseException, builtins.Exception"
+[tool.pylint.main]
+extension-pkg-allow-list=["pydantic"]
+load-plugins=["pylint_pydantic"]
+
+[tool.pylint.exceptions]
+overgeneral-exceptions=["builtins.BaseException", "builtins.Exception"]
 
 
 [build-system]

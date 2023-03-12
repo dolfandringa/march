@@ -4,6 +4,8 @@ Main March backend.
 import uvicorn
 from fastapi import FastAPI
 
+from . import auth
+
 app = FastAPI()
 
 
@@ -12,6 +14,9 @@ async def root() -> dict:
     """Root Hello World page"""
 
     return {"message": "Hello World"}
+
+
+app.include_router(auth.router)
 
 
 def start():
