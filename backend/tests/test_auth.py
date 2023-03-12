@@ -7,7 +7,7 @@ import pytest
 from fastapi import HTTPException
 
 from march_backend import auth
-from march_backend.auth import get_google_session, oauth_start
+from march_backend.auth import get_google_session, oauth_start, oauth_token
 
 pytestmark = pytest.mark.asyncio
 
@@ -73,6 +73,7 @@ class MockGoogleSession:  # pylint: disable=too-few-public-methods
     """Mock Google OAuth2 Session"""
 
     authorization_url = MagicMock(return_value=["bla"])
+    fetch_token = MagicMock(return_value="Fake token")
 
 
 class TestOAuthStart:
@@ -120,4 +121,52 @@ class TestOAuthStart:
         )
         with pytest.raises(HTTPException) as exc:
             await oauth_start()
+        assert exc.value.status_code == 403
+
+
+class TestOAuthToken:
+    """Test oauth_token"""
+
+    async def test_default(self, mocker, secret):
+        """Test default behaviour"""
+        mock_get_google_session = mocker.patch.object(auth, "get_google_session")
+        mock_google = MockGoogleSession()
+        secret = json.loads(secret)["web"]
+        mock_get_google_session.return_value = (
+            mock_google,
+            secret,
+        )
+        res = await oauth_token("state", "code")
+        mock_get_google_session.assert_called_once_with(state="state")
+        mock_google.fetch_token.assert_called_once_with(
+            secret["token_uri"], client_secret=secret["client_secret"], code="code"
+        )
+        assert res == mock_google.fetch_token.return_value
+
+    async def test_get_google_session_error(self, mocker):
+        """
+        Test that a 403 Forbidden exception was raised
+        on get_google_session errors.
+        """
+        mock_get_google_session = mocker.patch.object(auth, "get_google_session")
+        mock_get_google_session.side_effect = TypeError("Test")
+        with pytest.raises(HTTPException) as exc:
+            await oauth_token("state", "code")
+        assert exc.value.status_code == 403
+
+    async def test_fetch_token_error(self, mocker, secret):
+        """
+        Test that a 403 Forbidden exception was raised
+        on google.fetch_token errors.
+        """
+        mock_get_google_session = mocker.patch.object(auth, "get_google_session")
+        mock_google = MockGoogleSession()
+        mock_google.fetch_token.side_effect = TypeError("Test")
+        secret = json.loads(secret)["web"]
+        mock_get_google_session.return_value = (
+            mock_google,
+            secret,
+        )
+        with pytest.raises(HTTPException) as exc:
+            await oauth_token("state", "code")
         assert exc.value.status_code == 403
