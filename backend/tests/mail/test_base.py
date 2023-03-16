@@ -1,7 +1,10 @@
 """Test Base Mail classes"""
 
+from imaplib import IMAP4
+
 import pytest
 
+from march_backend.exceptions import PermissionDeniedError
 from march_backend.mail import base
 
 
@@ -26,6 +29,17 @@ class TestBaseMailProvider:
         mock_login = mocker.patch.object(connection, "login")
         mock_login.return_value = "OK", ""
         provider.get_connection(username, password)
+        connection.login.assert_called_once_with(username, password)
+
+    def test_get_connection_error(self, mocker, imap):
+        """test get_connection when raising an imap error."""
+        username = "dolf"
+        password = "secret"
+        provider, connection = imap
+        mock_login = mocker.patch.object(connection, "login")
+        mock_login.side_effect = IMAP4.error("Permission denied")
+        with pytest.raises(PermissionDeniedError):
+            provider.get_connection(username, password)
         connection.login.assert_called_once_with(username, password)
 
     def test_search(self, mocker, imap):

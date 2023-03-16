@@ -5,6 +5,7 @@ import uvicorn
 from fastapi import FastAPI
 
 from . import auth
+from .mail import base, gmail
 
 app = FastAPI()
 
@@ -16,7 +17,9 @@ async def root() -> dict:
     return {"message": "Hello World"}
 
 
-app.include_router(auth.router)
+app.include_router(auth.router, prefix="/auth")
+app.include_router(base.router, prefix="/mail/base")
+app.include_router(gmail.router, prefix="/mail/gmail")
 
 
 def start():

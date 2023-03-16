@@ -22,7 +22,7 @@ class OAuth2TokenModel(BaseModel):
     expires_at: float
 
 
-@router.get("/auth/", tags=["authentication"])
+@router.get("/", tags=["authentication"])
 async def root():
     """Main page."""
     return {"message": "Authenticating."}
@@ -54,7 +54,7 @@ async def get_google_session(
     )
 
 
-@router.get("/auth/oauth/token", tags=["authentication"])
+@router.get("/oauth/token", tags=["authentication"])
 async def oauth_token(state: str, code: str) -> OAuth2TokenModel:
     """Get the OAuth2 authentication token."""
     try:
@@ -71,9 +71,7 @@ async def oauth_token(state: str, code: str) -> OAuth2TokenModel:
     return token
 
 
-@router.get(
-    "/auth/oauth/start", tags=["authentication"], response_class=RedirectResponse
-)
+@router.get("/oauth/start", tags=["authentication"], response_class=RedirectResponse)
 async def oauth_start():
     """Authenticate using OAuth for google."""
     try:
