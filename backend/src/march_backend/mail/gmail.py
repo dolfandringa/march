@@ -1,7 +1,9 @@
 """GMail classes"""
 import imaplib
 import logging
+from email.message import Message
 from imaplib import IMAP4_SSL
+from typing import AsyncIterator, List
 
 from fastapi import APIRouter
 
@@ -30,10 +32,20 @@ class GMailProvider(BaseMailProvider):
             ) from exc
         return connection
 
+    async def fetch(
+        self,
+        ids: List[int],
+        connection: IMAP4_SSL,
+        fields=("RFC822", "BODY[TEXT]", "X-GM-LABELS", "X-GM-THRID", "X-GM-MSGID"),
+    ) -> AsyncIterator[Message]:
+        """Fetch GMail emails with additional fields."""
+        async for message in super().fetch(ids, connection, fields):
+            yield message
+
 
 @router.get("/search", tags=["mail", "gmail"])
 async def search(query: str, username: str, token: str):
     """Search gmail."""
     provider = GMailProvider()
-    res = provider.search(query, username, token)
+    res = await provider.search(query, username, token)
     return res

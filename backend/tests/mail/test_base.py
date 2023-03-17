@@ -1,7 +1,10 @@
 """Test Base Mail classes"""
 
-from email import message_from_string
+import logging
+from base64 import b64encode
+from email import message_from_bytes
 from imaplib import IMAP4
+from pathlib import Path
 from unittest.mock import call
 
 import pytest
@@ -9,6 +12,7 @@ import pytest
 from march_backend.exceptions import PermissionDeniedError
 from march_backend.mail import base
 
+logging.basicConfig(level=logging.DEBUG)
 pytestmark = pytest.mark.asyncio
 
 
@@ -22,40 +26,20 @@ def imap_fixture(mocker):
     return (provider, connection)
 
 
-@pytest.fixture(name="rfc822_email")
-def email_fixture():
-    """RFC822 email string."""
-    return (
-        """From: John Smith <john.smith@example.com>\r\n"""
-        """To: Jane Doe <jane.doe@example.com>\r\n"""
-        """Subject: Example Email\r\n"""
-        """Date: Thu, 17 Mar 2023 12:30:00 -0500\r\n"""
-        """Message-ID: <1234@example.com>\r\n\r\n"""
-        """Hello Jane,\r\n\r\nI hope this email finds you well."""
-        """I just wanted to reach out and say hello and see how you're doing. """
-        """It's been a while since we last spoke, and I wanted to catch up.\r\n\r\n"""
-        """Best regards,\r\n\r\nJohn"""
-    )
-
-
-class AsyncIterator:
-    """Wrapper to make a sequence into an async iterator."""
-
-    def __init__(self, seq):
-        self.iter = iter(seq)
-
-    def __aiter__(self):
-        return self
-
-    async def __anext__(self):
-        try:
-            return next(self.iter)
-        except StopIteration as exc:
-            raise StopAsyncIteration from exc
-
-
 class TestBaseMailProvider:
     """Test BaseMailProvider"""
+
+    def test_message_to_dict(self, rfc822_email: str, imap):
+        """Test turning a message into a dictionary"""
+        message = message_from_bytes(rfc822_email.encode("utf-8"))
+        provider, *_ = imap
+        actual = provider.message_to_dict(message)
+        image = b64encode((Path(__file__).parent / "example.png").open("rb").read())
+        assert dict(message).items() <= actual.items()
+        assert actual["attachments"] == [
+            {"name": "example.png", "content-type": "image/png", "content": image}
+        ]
+        assert len(actual["body"]) > 0 and isinstance(actual["body"], (bytes, str))
 
     def test_get_connection(self, mocker, imap):
         """test get_connection."""
@@ -78,20 +62,64 @@ class TestBaseMailProvider:
             provider.get_connection(username, password)
         connection.login.assert_called_once_with(username, password)
 
+    async def test_fetch_extra_fields(
+        self, mocker, imap, rfc822_email: str
+    ):  # pylint: disable=too-many-locals
+        """Test fetching and individual mail."""
+        ids = [1, 25, 12, 34]
+        email = rfc822_email.encode("utf-8")
+        fields = ("RFC822", "BODY[TEXT]", "X-OTHERFIELD")
+        calls = [call(str(id), f"""({" ".join(fields)})""") for id in ids]
+        provider, connection = imap
+        mock_fetch = mocker.patch.object(connection, "fetch")
+        mail_size = len(email)
+        extra_fields = f"""X-OTHERFIELDS 25 RC822 {{{mail_size}}}"""
+        messages = [
+            [
+                (
+                    f"{id} ({extra_fields}".encode("utf-8"),
+                    email,
+                ),
+                b")",
+            ]
+            for id in ids
+        ]
+        mock_fetch.side_effect = [(b"OK", message) for message in messages]
+        actual = [
+            provider.message_to_dict(message)
+            async for message in provider.fetch(ids, connection, fields=fields)
+        ]
+        assert mock_fetch.mock_calls == calls
+        expected = [
+            provider.message_to_dict(message_from_bytes(m[0][1])) for m in messages
+        ]
+        extra_fields = provider.get_extra_fields_from_imap(extra_fields, fields)
+        assert actual == [d | extra_fields for d in expected]
+
     async def test_fetch(self, mocker, imap, rfc822_email: str):
         """Test fetching and individual mail."""
         ids = [1, 25, 12, 34]
-        calls = [call(str(id), "(RFC822)") for id in ids]
+        email = rfc822_email.encode("utf-8")
+        calls = [call(str(id), "(RFC822 BODY[TEXT])") for id in ids]
         provider, connection = imap
         mock_fetch = mocker.patch.object(connection, "fetch")
-        messages = [rfc822_email] * len(ids)
-        mock_fetch.side_effect = [("OK", message) for message in messages]
-        actual = [dict(message) async for message in provider.fetch(ids, connection)]
+        mail_size = len(email)
+        messages = [
+            [(f"{id} (RFC822 {{{mail_size}}}".encode("utf-8"), email), b")"]
+            for id in ids
+        ]
+        mock_fetch.side_effect = [(b"OK", message) for message in messages]
+        actual = [
+            provider.message_to_dict(message)
+            async for message in provider.fetch(ids, connection)
+        ]
         assert mock_fetch.mock_calls == calls
-        assert actual == [dict(message_from_string(m)) for m in messages]
+        assert actual == [
+            provider.message_to_dict(message_from_bytes(m[0][1])) for m in messages
+        ]
 
     async def test_search(
-        self, mocker, imap, rfc822_email
+        self, mocker, imap, rfc822_email, AsyncIterator  # pylint: disable=invalid-name
     ):  # pylint: disable=too-many-locals
         """test search"""
         username = "dolf"
@@ -105,8 +133,9 @@ class TestBaseMailProvider:
         mock_search = mocker.patch.object(connection, "search")
         ids = [b"1 25 12 34"]
         expected = [
-            dict(message_from_string(m))
-            for m in [rfc822_email] * len(ids[0].decode("utf-8").split())
+            dict(message_from_bytes(m))
+            for m in [rfc822_email.encode("utf-8")]
+            * len(ids[0].decode("utf-8").split())
         ]
         mock_search.return_value = ("OK", ids)
         mock_fetch = mocker.patch.object(provider, "fetch")
