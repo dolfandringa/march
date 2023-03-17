@@ -1,6 +1,6 @@
 """GMail classes"""
 import imaplib
-from base64 import b64encode
+import logging
 from imaplib import IMAP4_SSL
 
 from fastapi import APIRouter
@@ -18,22 +18,22 @@ class GMailProvider(BaseMailProvider):
         """
         Get the connection using OAuth2 token.
         """
-        connection = IMAP4_SSL("imap.google.com")
-        auth_string = b64encode(
-            f"user={username}\1auth=Bearer {secret}\1\1".encode("utf-8")
-        )
+        log = logging.getLogger(__name__)
+        connection = IMAP4_SSL(host="imap.gmail.com")
+        auth_string = f"user={username}\1auth=Bearer {secret}\1\1".encode("utf-8")
         try:
+            log.debug("auth_string: %s", auth_string)
             connection.authenticate("XOAUTH2", lambda _: auth_string)
         except imaplib.IMAP4.error as exc:
             raise PermissionDeniedError(
-                "Permission denied when authenticating"
+                f"Permission denied when authenticating: {exc}"
             ) from exc
         return connection
 
 
 @router.get("/search", tags=["mail", "gmail"])
-async def search(query: str, username: str, token: str) -> str:
+async def search(query: str, username: str, token: str):
     """Search gmail."""
     provider = GMailProvider()
-    provider.search(query, username, token)
-    return "There you go!"
+    res = provider.search(query, username, token)
+    return res

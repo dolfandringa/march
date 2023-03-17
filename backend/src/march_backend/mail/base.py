@@ -1,6 +1,10 @@
 """Base mail classes to inherit from."""
 import imaplib
+import logging
+from email import message_from_string
+from email.message import Message
 from imaplib import IMAP4
+from typing import AsyncIterator, List
 
 from fastapi import APIRouter
 
@@ -25,15 +29,34 @@ class BaseMailProvider:
             ) from exc
         return connection
 
-    def search(self, term, username, secret):
+    async def fetch(self, ids: List[int], connection: IMAP4) -> AsyncIterator[Message]:
+        """Fetch emails by ids."""
+        log = logging.getLogger(__name__)
+        for mid in ids:
+            message = connection.fetch(str(mid), "(RFC822)")[1]
+            log.debug("Got message %s", message)
+            yield message_from_string(str(message))
+
+    async def search(self, query: str, username: str, secret: str) -> List[Message]:
         """Search for emails."""
+        log = logging.getLogger(__name__)
         connection = self.get_connection(username, secret)
-        return connection.search(term)
+        log.debug("Connection established. Capability: %s", connection.PROTOCOL_VERSION)
+        inboxes = connection.list()[1]
+        log.debug(inboxes)
+        connection.select(mailbox="INBOX")
+        res = connection.search(None, query)
+        if res[0] != "OK":
+            log.error("Unexpected error executing search %s", res)
+            raise RuntimeError("Unkown error executing search")
+        ids = res[1][0].decode("utf-8").split()
+        log.debug("ids: %s", ids)
+        return [message async for message in self.fetch(ids, connection)]
 
 
 @router.get("/search", tags=["mail"])
-async def search(username: str, password: str, query: str) -> str:
+async def search(username: str, password: str, query: str):
     """Search and return emails based on query."""
     provider = BaseMailProvider()
-    provider.search(query, username, password)
-    return "There you go"
+    res = provider.search(query, username, password)
+    return res
