@@ -48,4 +48,4 @@ async def search(query: str, username: str, token: str):
     """Search gmail."""
     provider = GMailProvider()
     res = await provider.search(query, username, token)
-    return res
+    return [provider.message_to_dict(m) for m in res]

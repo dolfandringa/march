@@ -1,4 +1,5 @@
 """Test Base Mail classes"""
+# pylint: disable=duplicate-code
 
 import logging
 from base64 import b64encode

@@ -1,4 +1,5 @@
 """Test GMail class"""
+# pylint: disable=duplicate-code
 
 from email import message_from_bytes
 from imaplib import IMAP4_SSL

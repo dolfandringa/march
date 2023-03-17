@@ -1,4 +1,5 @@
 """Tests for march_backend.auth"""
+# pylint: disable=duplicate-code
 import json
 from pathlib import Path
 from unittest.mock import MagicMock, mock_open
