@@ -20,7 +20,8 @@
     "forceConsistentCasingInFileNames": true,
     "strict": true,
     "noImplicitAny": true,
-    "skipLibCheck": true
+    "skipLibCheck": true,
+    "types": ["gapi", "gapi.auth2", "node"]
   },
   "include": ["src/**/*.d.ts", "src/**/*.ts", "src/**/*.tsx"],
   "exclude": ["node_modules"]
