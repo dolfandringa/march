@@ -12,7 +12,7 @@ from . import auth
 from .exceptions import PermissionDeniedError
 from .mail import base, gmail
 
-origins = ["http://localhost:3000"]
+origins = ["http://localhost:8080"]
 
 app = FastAPI()
 app.add_middleware(
