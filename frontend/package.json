@@ -70,7 +70,7 @@
     "postcss": "^8.4.21",
     "postcss-loader": "^7.1.0",
     "prettier": "^2.8.5",
-    "semantic-ui-less": "^2.5.0",
+    "semantic-ui-css": "^2.5.0",
     "style-loader": "^3.3.2",
     "ts-jest": "^29.0.5",
     "ts-loader": "^9.4.2",

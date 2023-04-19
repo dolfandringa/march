@@ -4,10 +4,12 @@ import { ResultsContext } from "../contexts/results-context";
 import { GmailService } from "../services/gmail-service";
 import { AuthContext } from "../contexts/auth-context";
 import { PermissionDeniedError } from "../exceptions";
+import { useAsyncError } from "./error-catcher";
 
 const SearchBar = () => {
   const [query, setQuery] = useState("");
   const [busy, setBusy] = useState(false);
+  const throwAsyncError = useAsyncError();
   const ctx = useContext(ResultsContext);
   if (!ctx) {
     throw new Error("Not a valid context given yet.");
@@ -28,12 +30,16 @@ const SearchBar = () => {
       throw new PermissionDeniedError("User is not logged in.");
     }
     const backend_url = await fb.getConfigVariable("backend_url");
-    const res = await GmailService.search(
-      backend_url,
-      query,
-      user.email,
-      token
-    );
+    try {
+      const res = await GmailService.search(
+        backend_url,
+        query,
+        user.email,
+        token
+      );
+    } catch(error) {
+      throwAsyncError(error);
+    }
     setEmails(res);
     setBusy(false);
   };
@@ -44,7 +50,7 @@ const SearchBar = () => {
 
   const handleKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
     if (event.key === "Enter") {
-      startSearch();
+        startSearch();
     }
   };
   return (

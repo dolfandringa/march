@@ -24,6 +24,10 @@ const getConfig = (): webpack.Configuration => {
           loader: "source-map-loader",
         },
         {
+          test: /\.css$/,
+          use: ["style-loader", "css-loader"],
+        },
+        {
           test: /\.less$/,
           use: [
             /*{
@@ -60,7 +64,7 @@ const getConfig = (): webpack.Configuration => {
           ],
         },
         // fonts
-        {
+        /*{
           test: /\.(eot|woff|woff2|ttf|svg)(\?.*$|$)/i,
           //use: ["file-loader"],
           use: [
@@ -68,10 +72,10 @@ const getConfig = (): webpack.Configuration => {
               loader: "file-loader",
               options: {
                 name: "[name].[contenthash].[ext]",
-              }
+              },
             },
           ],
-        },
+        },*/
         // this rule handles images
         {
           test: /\.jpe?g$|\.gif$|\.ico$|\.png$|\.svg$/,
